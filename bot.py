@@ -60,37 +60,29 @@ async def ping_server():
     try_java = MC_TYPE in ("auto", "java")
     try_bed  = MC_TYPE in ("auto", "bedrock") and BedrockServer is not None
 
-def motd_to_text(desc) -> str:
-    if isinstance(desc, str):
-        return desc
-    if isinstance(desc, dict):
-        parts = []
-        if 'text' in desc and isinstance(desc['text'], str):
-            parts.append(desc['text'])
-        if 'extra' in desc and isinstance(desc['extra'], list):
-            for e in desc['extra']:
-                if isinstance(e, dict) and 'text' in e and isinstance(e['text'], str):
-                    parts.append(e['text'])
-        return " ".join(parts)
-    return str(desc)
+    # Try Java first
+    if try_java:
+        try:
+            start = time.perf_counter()
+            srv = JavaServer.lookup(f"{MC_HOST}:{MC_PORT}")
+            status = await asyncio.to_thread(srv.status)
+            latency_ms = int((time.perf_counter() - start) * 1000)
+            online = getattr(status.players, "online", 0) or 0
 
-     #Try Java first
-if try_java:
-    try:
-        start = time.perf_counter()
-        srv = JavaServer.lookup(f"{MC_HOST}:{MC_PORT}")
-        status = await asyncio.to_thread(srv.status)
-        latency_ms = int((time.perf_counter() - start) * 1000)
-        online = getattr(status.players, "online", 0) or 0
+            # ---- Aternos guard: treat proxy "offline" MOTD as DOWN ----
+            desc_text = motd_to_text(getattr(status, "description", ""))
+            lt = desc_text.lower()
+            looks_aternos_off = (
+                "aternos" in lt and ("offline" in lt or "start" in lt or "queue" in lt)
+            )
+            if looks_aternos_off:
+                return False, 0, None
+            # -----------------------------------------------------------
 
-        # ---- Aternos guard: treat proxy "offline" MOTD as DOWN ----
-        desc_text = motd_to_text(getattr(status, "description", ""))
-        lt = desc_text.lower()
-        looks_aternos_off = (
-            "aternos" in lt and ("offline" in lt or "start" in lt or "queue" in lt)
-        )
-        if looks_aternos_off:
-            return False, 0, None
+            return True, online, latency_ms
+        except Exception:
+            if MC_TYPE == "java":
+                return False, 0, None
 
     # Then Bedrock
     if try_bed:
