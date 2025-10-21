@@ -60,19 +60,23 @@ async def ping_server():
     try_java = MC_TYPE in ("auto", "java")
     try_bed  = MC_TYPE in ("auto", "bedrock") and BedrockServer is not None
 
-    # Try Java first
-    if try_java:
-        try:
-            start = time.perf_counter()
-            srv = JavaServer.lookup(f"{MC_HOST}:{MC_PORT}")
-            status = await asyncio.to_thread(srv.status)
-            latency_ms = int((time.perf_counter() - start) * 1000)
-            online = getattr(status.players, "online", 0) or 0
-            # mcstatus for Java also has status.latency (ms), but we compute our own for both paths
-            return True, online, latency_ms
-        except Exception:
-            if MC_TYPE == "java":
-                return False, 0, None
+     Try Java first
+if try_java:
+    try:
+        start = time.perf_counter()
+        srv = JavaServer.lookup(f"{MC_HOST}:{MC_PORT}")
+        status = await asyncio.to_thread(srv.status)
+        latency_ms = int((time.perf_counter() - start) * 1000)
+        online = getattr(status.players, "online", 0) or 0
+
+        # ---- Aternos guard: treat proxy "offline" MOTD as DOWN ----
+        desc_text = motd_to_text(getattr(status, "description", ""))
+        lt = desc_text.lower()
+        looks_aternos_off = (
+            "aternos" in lt and ("offline" in lt or "start" in lt or "queue" in lt)
+        )
+        if looks_aternos_off:
+            return False, 0, None
 
     # Then Bedrock
     if try_bed:
@@ -103,6 +107,21 @@ def fmt_uptime(since: datetime | None) -> str:
     if h: parts.append(f"{h}h")
     parts.append(f"{m}m")
     return " ".join(parts)
+
+def motd_to_text(desc) -> str:
+    # mcstatus may return str or a dict with 'text'/'extra'
+    if isinstance(desc, str):
+        return desc
+    if isinstance(desc, dict):
+        parts = []
+        if 'text' in desc and isinstance(desc['text'], str):
+            parts.append(desc['text'])
+        if 'extra' in desc and isinstance(desc['extra'], list):
+            for e in desc['extra']:
+                if isinstance(e, dict) and 'text' in e and isinstance(e['text'], str):
+                    parts.append(e['text'])
+        return " ".join(parts)
+    return str(desc)
 
 @tasks.loop(seconds=INTERVAL)
 async def updater():
