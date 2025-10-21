@@ -60,6 +60,20 @@ async def ping_server():
     try_java = MC_TYPE in ("auto", "java")
     try_bed  = MC_TYPE in ("auto", "bedrock") and BedrockServer is not None
 
+def motd_to_text(desc) -> str:
+    if isinstance(desc, str):
+        return desc
+    if isinstance(desc, dict):
+        parts = []
+        if 'text' in desc and isinstance(desc['text'], str):
+            parts.append(desc['text'])
+        if 'extra' in desc and isinstance(desc['extra'], list):
+            for e in desc['extra']:
+                if isinstance(e, dict) and 'text' in e and isinstance(e['text'], str):
+                    parts.append(e['text'])
+        return " ".join(parts)
+    return str(desc)
+
      #Try Java first
 if try_java:
     try:
@@ -107,21 +121,6 @@ def fmt_uptime(since: datetime | None) -> str:
     if h: parts.append(f"{h}h")
     parts.append(f"{m}m")
     return " ".join(parts)
-
-def motd_to_text(desc) -> str:
-    # mcstatus may return str or a dict with 'text'/'extra'
-    if isinstance(desc, str):
-        return desc
-    if isinstance(desc, dict):
-        parts = []
-        if 'text' in desc and isinstance(desc['text'], str):
-            parts.append(desc['text'])
-        if 'extra' in desc and isinstance(desc['extra'], list):
-            for e in desc['extra']:
-                if isinstance(e, dict) and 'text' in e and isinstance(e['text'], str):
-                    parts.append(e['text'])
-        return " ".join(parts)
-    return str(desc)
 
 @tasks.loop(seconds=INTERVAL)
 async def updater():
