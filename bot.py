@@ -60,7 +60,7 @@ async def ping_server():
     try_java = MC_TYPE in ("auto", "java")
     try_bed  = MC_TYPE in ("auto", "bedrock") and BedrockServer is not None
 
-     Try Java first
+     #Try Java first
 if try_java:
     try:
         start = time.perf_counter()
